@@ -27,6 +27,11 @@ var myAccessories = [];
 var session; // reuse the same login session
 var updating; // Only one change at a time!!!!
 
+let reducer = { active: 0, targetFanState: 0 }
+reducer.prototype = {
+    setActive
+}
+
 module.exports = function(homebridge) {
 
     Accessory = homebridge.platformAccessory;
@@ -96,6 +101,10 @@ tccPlatform.prototype = {
             that.log("Error during Login:", err);
             callback(err);
         });
+    },
+    periodicUpdate: function(t) {
+        this.log("periodicUpdate");
+        var t = updateValues(this);
     }
 };
 
@@ -105,13 +114,6 @@ function updateStatus(that, service, data) {
     if (data.hasFan && data.fanData && data.fanData.fanModeOnAllowed) {
         service.getCharacteristic(Characteristic.On).getValue();
     }
-
-
-}
-
-tccPlatform.prototype.periodicUpdate = function(t) {
-    this.log("periodicUpdate");
-    var t = updateValues(this);
 }
 
 function updateValues(that) {
@@ -131,7 +133,7 @@ function updateValues(that) {
                     that.log("Error during Login:", err);
                 });
             } else {
-                if (that.debug)
+                if (that.debug)z
                     that.log("Update Values", accessory.name, deviceData);
                 // Data is live
 
@@ -224,7 +226,6 @@ tccAccessory.prototype = {
 //         Characteristic.TargetFanState.AUTO = 1;
 
         var TargetFanState = tcc.toHomeBridgeFanSystem(this.device.latestData.fanData.fanMode);
-
         this.log("getTargetFanState is ", TargetFanState,this.name);
 
         callback(null, Boolean(TargetFanState));
@@ -244,7 +245,7 @@ tccAccessory.prototype = {
             .setCharacteristic(Characteristic.SerialNumber, this.deviceID); // need to stringify the this.serial
 
         // Fan Service
-        this.fanService = new Service.Fan(this.name);
+        this.fanService = new Service.Fanv2(this.name);
 
         // this.addOptionalCharacteristic(Characteristic.Name);
         this.fanService
@@ -252,9 +253,28 @@ tccAccessory.prototype = {
             .on('get', this.getName.bind(this));
 
         // this.addOptionalCharacteristic(Characteristic.On);
+        // fanData:
+        // { fanMode: 0,
+        //     fanModeAutoAllowed: true,
+        //     fanModeOnAllowed: true,
+        //     fanModeCirculateAllowed: true,
+        //     fanModeFollowScheduleAllowed: false,
+        //     fanIsRunning: false },
+        this.fanService
+            .getCharacteristic(Characteristic.CurrentFanState)
+            .on('get', this.getState.bind(this));
+
         if (this.device.latestData.hasFan && this.device.latestData.fanData && this.device.latestData.fanData.fanModeOnAllowed) {
+            // this.fanService
+            //     .getCharacteristic(Characteristic.On)
+            //     .on('get', this.getState.bind(this))
+            //     .on('set', this.setState.bind(this));
             this.fanService
-                .getCharacteristic(Characteristic.On)
+                .getCharacteristic(Characteristic.Active)
+                .on('get', this.getState.bind(this))
+                .on('set', this.setState.bind(this));
+            this.fanService
+                .getCharacteristic(Characteristic.TargetFanState)
                 .on('get', this.getState.bind(this))
                 .on('set', this.setState.bind(this));
         }
